@@ -1,6 +1,10 @@
 stanford-postagger*/
 config.ini
 
+# Mac
+**/.DS_Store
+
+
 # JetBrains IDEs
 .idea/
 
