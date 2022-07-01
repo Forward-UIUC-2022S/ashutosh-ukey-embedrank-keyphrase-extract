@@ -1,15 +1,17 @@
-This is the implementation of the following paper: https://arxiv.org/abs/1801.04470
+This module is responsible for extracting a global list of keywords from a set of papers. This repo is a fork of the implementation of https://arxiv.org/abs/1801.04470
 
-# Installation
+# Setup
 
-## Local Installation
+## Local
 
 1. Download full Stanford CoreNLP Tagger version 3.8.0
 http://nlp.stanford.edu/software/stanford-corenlp-full-2018-02-27.zip
 
+2. Download arxiv papers snapshot from https://www.kaggle.com/datasets/Cornell-University/arxiv (the arxiv-metadata-oai-snapshot.json file)
+
 2. Install sent2vec from 
 https://github.com/epfml/sent2vec
-    * Clone/Download the directory
+    * Clone/download the directory
     * go to sent2vec directory
     * git checkout f827d014a473aa22b2fef28d9e29211d50808d48
     * make
@@ -18,20 +20,20 @@ https://github.com/epfml/sent2vec
         * ``python setup.py build_ext``
         * ``pip install . ``
         * (In OSX) If the setup.py throws an **error** (ignore warnings), open setup.py and add '-stdlib=libc++' in the compile_opts list.        
-    * Download a pre-trained model (see readme of Sent2Vec repo) , for example wiki_bigrams.bin
+    * Download sent2vec pretrained model wiki_bigrams.bin (see readme of Sent2Vec repo, should be ~16GB). 
      
 3. Install requirements
     
     After cloning this repository go to the root directory and
     ``pip install -r requirements.txt``
 
-4. Download NLTK data
+5. Download NLTK data
 ```
 import nltk 
 nltk.download('punkt')
 ```
 
-5. Launch Stanford Core NLP tagger
+6. Launch Stanford Core NLP tagger
     * Open a new terminal
     * Go to the stanford-core-nlp-full directory
     * Run the server `java -mx4g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -preload tokenize,ssplit,pos -status_port 9000 -port 9000 -timeout 15000 & `
@@ -49,31 +51,31 @@ nltk.download('punkt')
 
 ## Docker
 
-Probably the easiest way to get started is by using the provided Docker image.
-From the project's root directory, the image can be built like so:
-```
-$ docker build . -t keyphrase-extraction
-```
-This can take a few minutes to finish.
-Also, keep in mind that pre-trained sent2vec models will not be downloaded since each model is several GBs in size and don't forget to allocate enough memory to your docker container (models are loaded in RAM).
+See README of original repo for instructions on how to setup using Docker.
 
-To launch the model in an interactive mode, in order to use your own code, run
-```
-$ docker run -v {path to wiki_bigrams.bin}:/sent2vec/pretrained_model.bin -it keyphrase-extraction
-# Run the corenlp server
-/app # cd /stanford-corenlp
-/stanford-corenlp # nohup java -mx4g -cp "*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer -preload tokenize,ssplit,pos -status_port 9000 -port 9000 -timeout 15000 &
-# Press enter to get stdin back
-/stanford-corenlp # cd /app
-/app # python
->>> import launch
-```
-You have to specify the path to your sent2vec model using the `-v` argument.
-If, for example, you should choose not to use the *wiki_bigrams.bin* model, adjust your path accordingly (and of course, remember to remove the curly brackets).
+&nbsp;
+# Usage (Functional Design)
 
-# Usage
+Make sure the CoreNLP server is running
 
-Once the CoreNLP server is running
+## Set of Papers
+To extract keywords from a corpus of papers (e.g. arxiv), run the file.
+
+```bash
+python3 group_keyphrases.py
+```
+
+Make sure you specify `arxiv_file` and `output_file` variables. Here is a description of other program hyper-parameters:
+- filter_categ_re: regular expression of subcategory of arxiv topics to filter by
+- num_kwds_per_paper: number of top keywords to extract from each paper
+- filter_thresh: minimum frequency needed among papers for a keyword to be a candidate
+
+The output file will be a json 
+
+&nbsp;
+## Single Paper
+
+The above program relies on being able to extract keywords from a single paper:
 
 ```
 import launch
@@ -92,14 +94,13 @@ This return for each text a tuple containing three lists:
 3) For each keyphrase a list of alias (other candidates very similar to the one selected
 as keyphrase)
 
-# Method
+&nbsp;
+# Methodology (Algorithmic Design)
 
-This is the implementation of the following paper:
-https://arxiv.org/abs/1801.04470
+## Single paper
+By using sentence embeddings , EmbedRank embeds both the document and candidate phrases into the same embedding space.
 
 ![embedrank](embedrank.gif)
-
-By using sentence embeddings , EmbedRank embeds both the document and candidate phrases into the same embedding space.
 
 N candidates are selected as keyphrases by using Maximal Margin Relevance using the cosine similarity between the candidates and the
 document in order to model the informativness and the cosine
@@ -116,4 +117,11 @@ kp1 = launch.extract_keyphrases(embedding_distributor, pos_tagger, raw_text, 10,
 ```
 
 If you want to replicate the results of the paper you have to set beta to 1 or 0.5 and turn off the alias feature by specifiying alias_threshold=1 to extract_keyphrases method.
+
+&nbsp;
+## Multiple papers
+
+Using the above algorithm with `beta=1`, we extract the top `num_kwds_per_paper` (the default is 10) from each paper and aggregate the number of papers each keyword appears in. We sort the keywords by this frequency from most to least frequent.
+
+To improve keyword quality, users may also take the intersection of these keywords with some other set of keywords.
 

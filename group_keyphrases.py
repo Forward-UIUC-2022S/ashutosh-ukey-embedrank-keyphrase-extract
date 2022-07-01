@@ -1,3 +1,6 @@
+"""
+    This file extracts a global list of keywords from some sub category in the arxiv snapshot of papers.
+"""
 import re
 import json
 import launch
@@ -6,9 +9,19 @@ import pickle
 from tqdm import tqdm
 
 
-data_root_dir = "/Users/ashutoshukey/Downloads/Forward_Data_Lab/Code/data"
 arxiv_file = f"../../data/arxiv-metadata-oai-snapshot.json"
 output_file = '../../data/csKeywordsNoDiv.json'
+
+
+# Minimum frequency needed among papers for a keyword to be a candidate
+filter_thresh = 0
+
+# Arxiv category to filter by (in the below case, regex will match computer science category). See https://arxiv.org/category_taxonomy
+filter_categ_re = re.compile(r"\bcs\.")
+
+# The number of top keywords to extract per paper when computing global frequency counts
+num_kwds_per_paper = 10
+
 
 def get_paper_data():
     with open(arxiv_file, 'r') as f:
@@ -35,7 +48,6 @@ def increment_counts(words):
 embedding_distributor = launch.load_local_embedding_distributor()
 pos_tagger = launch.load_local_corenlp_pos_tagger()
 
-cs_categ_re = re.compile(r"\bcs\.")
 papers = get_paper_data()
 
 
@@ -46,12 +58,12 @@ p_i = 0
 for i in tqdm(range(len(papers))):
     paper = papers[i]
     paper = json.loads(paper)
-    cs_categs = cs_categ_re.search(paper['categories'])
+    cs_categs = filter_categ_re.search(paper['categories'])
 
     if cs_categs is not None:
         raw_text = paper['title'] + " " + paper['abstract']
 
-        keywords_t = launch.extract_keyphrases(embedding_distributor, pos_tagger, raw_text, 10, 'en', beta=1)
+        keywords_t = launch.extract_keyphrases(embedding_distributor, pos_tagger, raw_text, num_kwds_per_paper, 'en', beta=1)
         keywords = keywords_t[0]
 
         increment_counts(keywords)
@@ -64,7 +76,7 @@ for i in tqdm(range(len(papers))):
     #     print("On " + str(p_i) + "th paper")
 
 
-filter_thresh = 0
+
 top_words = freq_dict.items()
 top_words = filter(lambda x: x[1] > filter_thresh, top_words)
 top_words = sorted(top_words, key=lambda x: x[1], reverse=True)
