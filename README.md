@@ -1,4 +1,4 @@
-This module is responsible for extracting a global list of keywords from a set of papers. This repo is a fork of the implementation of https://arxiv.org/abs/1801.04470
+This module is responsible for extracting a global list of keywords from a set of papers. This repo is a fork of https://github.com/swisscom/ai-research-keyphrase-extraction.
 
 # Setup
 
